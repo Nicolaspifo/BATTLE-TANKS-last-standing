@@ -26,9 +26,15 @@ namespace NetworkingLab.NGO
             localPlayerText = localPlayer;
         }
 
-        private void Awake()
+        private void Start()
         {
             manager = NetworkManager.Singleton;
+            if (manager == null)
+            {
+                SetStatus("NetworkManager not found in scene");
+                return;
+            }
+
             addressInput.text = ReadArgument("-address", "127.0.0.1");
             portInput.text = ReadArgument("-port", DefaultPort.ToString());
 

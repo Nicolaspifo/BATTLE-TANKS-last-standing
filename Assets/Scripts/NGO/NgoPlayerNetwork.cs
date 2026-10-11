@@ -66,15 +66,18 @@ namespace NetworkingLab.NGO
             if (!IsOwner || !IsClient || moveAction == null) return;
             Vector2 move = Vector2.ClampMagnitude(moveAction.ReadValue<Vector2>(), 1f);
             ApplyLocalPreview(move);
-            // STUDENT TODO NGO-01: send the owning client's movement input to the server.
-            // Suggested next step: call SubmitMoveRpc(move) and compare preview vs. authority.
+            SubmitMoveRpc(move);
         }
 
         private void FixedUpdate()
         {
             if (!IsServer || !IsSpawned) return;
-            // STUDENT TODO NGO-02: validate pendingServerInput and move only on the server.
-            // NetworkTransform is already attached and will replicate the authoritative result.
+            Vector2 move = Vector2.ClampMagnitude(pendingServerInput, 1f);
+            Vector3 next = transform.position + new Vector3(move.x, 0f, move.y) * (moveSpeed * Time.fixedDeltaTime);
+            next.x = Mathf.Clamp(next.x, -horizontalBounds.x, horizontalBounds.x);
+            next.z = Mathf.Clamp(next.z, -horizontalBounds.y, horizontalBounds.y);
+            transform.position = next;
+
         }
 
         [Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable, InvokePermission = RpcInvokePermission.Owner)]
@@ -85,9 +88,20 @@ namespace NetworkingLab.NGO
 
         private void OnPowerUpPerformed(InputAction.CallbackContext context)
         {
-            PowerUpEvents.RaiseActivated($"Player {Mathf.Max(1, playerNumber.Value)}");
-            // STUDENT TODO NGO-03: replace this local preview with a Server RPC that validates
-            // the request and a Client RPC that raises PowerUpEvents on all clients.
+            RequestPowerUpRpc();
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Owner)]
+        private void RequestPowerUpRpc()
+        {
+            if (!IsSpawned || playerNumber.Value <= 0) return;
+            AnnouncePowerUpRpc(playerNumber.Value);
+        }
+
+        [Rpc(SendTo.ClientsAndHost)]
+        private void AnnouncePowerUpRpc(int number)
+        {
+            PowerUpEvents.RaiseActivated($"Player {number}");
         }
 
         private void ApplyLocalPreview(Vector2 move)
