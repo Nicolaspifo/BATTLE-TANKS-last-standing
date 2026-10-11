@@ -8,7 +8,7 @@ El proyecto está desarrollado sobre **Unity 6 (6000.6.0f1)** e implementa una a
 
 ## Descripción del Juego
 
-En **Tank Arena**, cada jugador controla un tanque personalizable (con colores distintivos, sombreros y accesorios) en partidas competitivas en tiempo real.
+En **Battle Tanks Last Standing**, cada jugador controla un tanque personalizable (con colores distintivos, sombreros y accesorios) en partidas competitivas en tiempo real.
 
 * **Objetivo:** Sobrevivir a los oponentes eliminando los tanques rivales mediante proyectiles y tácticas defensivas.
 * **Escenarios:** Arenas rectangulares equipadas con cobertura dinámica (muros, barreras y estructuras destructibles) que permiten planificar emboscadas o protegerse de los ataques.
