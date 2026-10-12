@@ -2,6 +2,7 @@ using System;
 using Unity.NetCode;
 using UnityEngine.SceneManagement;
 using UnityEngine.Scripting;
+using Unity.Entities;
 
 namespace NetworkingLab.NFE
 {
@@ -11,6 +12,8 @@ namespace NetworkingLab.NFE
     {
         public override bool Initialize(string defaultWorldName)
         {
+            UnityEngine.Application.runInBackground = true;
+
             string sceneName = SceneManager.GetActiveScene().name;
             bool explicitNfe = Array.Exists(Environment.GetCommandLineArgs(), arg =>
                 string.Equals(arg, "-nfe", StringComparison.OrdinalIgnoreCase));
@@ -36,6 +39,28 @@ namespace NetworkingLab.NFE
             {
                 CreateServerWorld("ServerWorld");
                 CreateClientWorld("ClientWorld");
+            }
+
+            // Configure tick rate for smoother Editor testing
+            var tickRate = new Unity.NetCode.ClientServerTickRate
+            {
+                SimulationTickRate = 60,
+                NetworkTickRate = 60,
+                MaxSimulationStepsPerFrame = 4,
+                MaxSimulationStepBatchSize = 2
+            };
+            tickRate.ResolveDefaults();
+            foreach (var w in Unity.Entities.World.All)
+            {
+                if ((w.Name == "ServerWorld" || w.Name == "ClientWorld") && w.IsCreated)
+                {
+                    var query = w.EntityManager.CreateEntityQuery(typeof(Unity.NetCode.ClientServerTickRate));
+                    if (query.CalculateEntityCount() == 0)
+                    {
+                        w.EntityManager.CreateSingleton(tickRate);
+                    }
+                    query.Dispose();
+                }
             }
 
             return true;

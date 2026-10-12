@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using NetworkingLab.Combat;
 using NetworkingLab.NFE;
 using NetworkingLab.NGO;
 using NetworkingLab.UI;
@@ -30,6 +31,11 @@ namespace NetworkingLab.Editor
         public const string NfePrefabPath = "Assets/Prefabs/NFEPlayer.prefab";
         private const string InputPath = "Assets/Input/LocalPlayers.inputactions";
 
+        // Optional: set these to reuse your own tank prefab and map in the generated NGO/NFE scenes.
+        // The tank prefab must already have NetworkObject, NetworkTransform and NgoPlayerNetwork.
+        public const string CustomNgoPlayerPrefabPath = "";
+        public const string CustomMapPrefabPath = "";
+
         [MenuItem("Networking Lab/Build NGO and NFE Scenes")]
         public static void BuildAll()
         {
@@ -53,6 +59,17 @@ namespace NetworkingLab.Editor
 
         private static GameObject BuildNgoPrefab(InputActionAsset input)
         {
+            if (!string.IsNullOrEmpty(CustomNgoPlayerPrefabPath))
+            {
+                GameObject custom = AssetDatabase.LoadAssetAtPath<GameObject>(CustomNgoPlayerPrefabPath);
+                if (custom != null)
+                {
+                    return custom;
+                }
+
+                Debug.LogWarning("Custom NGO player prefab not found: " + CustomNgoPlayerPrefabPath);
+            }
+
             AssetDatabase.DeleteAsset(NgoPrefabPath);
             GameObject root = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             root.name = "NGOPlayer";
@@ -82,7 +99,8 @@ namespace NetworkingLab.Editor
             }
 
             NgoPlayerNetwork player = root.AddComponent<NgoPlayerNetwork>();
-            player.Configure(input, "Player 1", renderer, label, 5f, new Vector2(10.5f, 7.5f));
+            player.Configure(input, "Player 1", renderer, label, 5f);
+            root.AddComponent<TankFacing>();
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, NgoPrefabPath);
             Object.DestroyImmediate(root);
             return prefab;
@@ -92,6 +110,7 @@ namespace NetworkingLab.Editor
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BuildEnvironment();
+            BuildSpawnPoints();
 
             GameObject managerObject = new("NetworkManager");
             UnityTransport transport = managerObject.AddComponent<UnityTransport>();
@@ -162,12 +181,52 @@ namespace NetworkingLab.Editor
             EditorSceneManager.SaveScene(scene, NfeScenePath);
         }
 
+        private static void BuildSpawnPoints()
+        {
+            GameObject root = new("Spawn Points");
+            NgoSpawnPoints spawns = root.AddComponent<NgoSpawnPoints>();
+            Vector3[] positions = { new(-6f, 0f, 6f), new(6f, 0f, 6f), new(-6f, 0f, -6f), new(6f, 0f, -6f) };
+            Object[] points = new Object[positions.Length];
+            for (int index = 0; index < positions.Length; index++)
+            {
+                GameObject point = new($"Spawn {index + 1}");
+                point.transform.SetParent(root.transform, false);
+                point.transform.position = positions[index];
+                points[index] = point.transform;
+            }
+
+            SerializedObject spawnsObject = new(spawns);
+            SerializedProperty pointsProperty = spawnsObject.FindProperty("points");
+            pointsProperty.arraySize = points.Length;
+            for (int index = 0; index < points.Length; index++)
+            {
+                pointsProperty.GetArrayElementAtIndex(index).objectReferenceValue = points[index];
+            }
+
+            spawnsObject.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static void BuildEnvironment()
         {
-            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground";
-            ground.transform.localScale = new Vector3(2.4f, 1f, 1.8f);
-            ground.GetComponent<Renderer>().sharedMaterial = GetOrCreateMaterial("NetworkGround", new Color(0.16f, 0.22f, 0.28f));
+            if (!string.IsNullOrEmpty(CustomMapPrefabPath))
+            {
+                GameObject map = AssetDatabase.LoadAssetAtPath<GameObject>(CustomMapPrefabPath);
+                if (map != null)
+                {
+                    PrefabUtility.InstantiatePrefab(map);
+                }
+                else
+                {
+                    Debug.LogWarning("Custom map prefab not found: " + CustomMapPrefabPath);
+                }
+            }
+            else
+            {
+                GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                ground.name = "Ground";
+                ground.transform.localScale = new Vector3(2.4f, 1f, 1.8f);
+                ground.GetComponent<Renderer>().sharedMaterial = GetOrCreateMaterial("NetworkGround", new Color(0.16f, 0.22f, 0.28f));
+            }
 
             GameObject lightObject = new("Directional Light");
             Light light = lightObject.AddComponent<Light>();

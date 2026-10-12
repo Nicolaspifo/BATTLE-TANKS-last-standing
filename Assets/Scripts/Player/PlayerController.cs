@@ -7,15 +7,16 @@ namespace NetworkingLab.Player
     {
         [SerializeField] private PlayerInputSource inputSource;
         [SerializeField, Min(0f)] private float moveSpeed = 5f;
-        [SerializeField] private Vector2 horizontalBounds = new(10.5f, 7.5f);
+        [SerializeField] private LayerMask obstacleLayers = ~0;
+        [SerializeField, Min(0.05f)] private float collisionRadius = 0.4f;
+        [SerializeField, Min(0.05f)] private float collisionHeight = 0.8f;
 
         public PlayerInputSource InputSource => inputSource;
 
-        public void Configure(PlayerInputSource source, float speed, Vector2 bounds)
+        public void Configure(PlayerInputSource source, float speed)
         {
             inputSource = source;
             moveSpeed = speed;
-            horizontalBounds = bounds;
         }
 
         private void Update()
@@ -30,10 +31,8 @@ namespace NetworkingLab.Player
         {
             Vector2 normalizedInput = Vector2.ClampMagnitude(input, 1f);
             Vector3 displacement = new Vector3(normalizedInput.x, 0f, normalizedInput.y) * (moveSpeed * deltaTime);
-            Vector3 next = transform.position + displacement;
-            next.x = Mathf.Clamp(next.x, -horizontalBounds.x, horizontalBounds.x);
-            next.z = Mathf.Clamp(next.z, -horizontalBounds.y, horizontalBounds.y);
-            transform.position = next;
+            Vector3 current = transform.position;
+            transform.position = MovementCollision.Resolve(transform, current, current + displacement, obstacleLayers, collisionRadius, collisionHeight);
         }
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using NetworkingLab.Combat;
 using NetworkingLab.Player;
 using NetworkingLab.PowerUp;
 using NetworkingLab.UI;
@@ -19,15 +20,17 @@ namespace NetworkingLab.Editor
     {
         private const string ScenePath = "Assets/Scenes/LocalGameplayBaseline.unity";
         private const string InputPath = "Assets/Input/LocalPlayers.inputactions";
+        private const string ProjectilePrefabPath = "Assets/Resources/Combat/Projectile.prefab";
 
         [MenuItem("Networking Lab/Build Local Baseline")]
         public static void Build()
         {
             InputActionAsset inputAsset = BuildInputActions();
+            GameObject projectilePrefab = BuildProjectilePrefab();
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             BuildEnvironment();
-            BuildPlayers(inputAsset);
+            BuildPlayers(inputAsset, projectilePrefab);
             BuildUi();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -86,7 +89,36 @@ namespace NetworkingLab.Editor
             cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 16f, -12f), Quaternion.Euler(52f, 0f, 0f));
         }
 
-        private static void BuildPlayers(InputActionAsset inputAsset)
+        private static GameObject BuildProjectilePrefab()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            {
+                AssetDatabase.CreateFolder("Assets", "Resources");
+            }
+
+            if (!AssetDatabase.IsValidFolder("Assets/Resources/Combat"))
+            {
+                AssetDatabase.CreateFolder("Assets/Resources", "Combat");
+            }
+
+            AssetDatabase.DeleteAsset(ProjectilePrefabPath);
+
+            GameObject root = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            root.name = "Projectile";
+            root.transform.localScale = Vector3.one * 0.5f;
+            root.GetComponent<SphereCollider>().isTrigger = true;
+            Rigidbody body = root.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.useGravity = false;
+            root.GetComponent<Renderer>().sharedMaterial = GetOrCreateMaterial("Projectile", new Color(1f, 0.85f, 0.25f));
+            root.AddComponent<Projectile>();
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, ProjectilePrefabPath);
+            Object.DestroyImmediate(root);
+            return prefab;
+        }
+
+        private static void BuildPlayers(InputActionAsset inputAsset, GameObject projectilePrefab)
         {
             Vector3[] positions =
             {
@@ -105,8 +137,24 @@ namespace NetworkingLab.Editor
 
                 PlayerInputSource input = player.AddComponent<PlayerInputSource>();
                 input.Configure(inputAsset, playerName);
-                player.AddComponent<PlayerController>().Configure(input, 5f, new Vector2(10.5f, 7.5f));
+                player.AddComponent<PlayerController>().Configure(input, 5f);
                 player.AddComponent<PlayerPowerUp>().Configure(playerName, input);
+                player.AddComponent<Health>().Configure(3, 1.5f);
+                player.AddComponent<TankFacing>();
+
+                GameObject barrelObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                barrelObject.name = "Barrel";
+                Object.DestroyImmediate(barrelObject.GetComponent<Collider>());
+                barrelObject.transform.SetParent(player.transform, false);
+                barrelObject.transform.localPosition = new Vector3(0f, 0f, 0.4f);
+                barrelObject.transform.localScale = new Vector3(0.22f, 0.22f, 1.1f);
+                barrelObject.GetComponent<Renderer>().sharedMaterial = GetOrCreateMaterial("Barrel", new Color(0.12f, 0.12f, 0.15f));
+
+                GameObject muzzleObject = new("Muzzle");
+                muzzleObject.transform.SetParent(barrelObject.transform, false);
+                muzzleObject.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+
+                player.AddComponent<TankWeapon>().Configure(input, projectilePrefab, barrelObject.transform, muzzleObject.transform);
 
                 GameObject labelObject = new("Label");
                 labelObject.transform.SetParent(player.transform, false);
